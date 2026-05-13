@@ -6,424 +6,395 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  Alert,
-  StatusBar,
   SafeAreaView,
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 
-// =============================================
-// Expense Tracker App - UTS React Native
-// =============================================
-
 export default function App() {
-  // --- STATE ---
-  const [transaksi, setTransaksi] = useState([
-    { id: '1', ket: 'Uang Saku', nominal: 500000, tipe: 'masuk' },
-    { id: '2', ket: 'Beli Cilok', nominal: 10000, tipe: 'keluar' },
-  ]);
-  const [inputKet, setInputKet] = useState('');
-  const [inputNominal, setInputNominal] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [keterangan, setKeterangan] = useState('');
+  const [nominal, setNominal] = useState('');
 
-  // --- LOGIKA HITUNG SALDO ---
-  const saldo = transaksi.reduce((total, item) => {
-    if (item.tipe === 'masuk') {
-      return total + item.nominal;
-    } else {
-      return total - item.nominal;
-    }
-  }, 0);
-
-  const totalMasuk = transaksi
+  // Hitung total pemasukan dan pengeluaran
+  const totalPemasukan = transactions
     .filter((t) => t.tipe === 'masuk')
-    .reduce((total, t) => total + t.nominal, 0);
+    .reduce((sum, t) => sum + t.nominal, 0);
 
-  const totalKeluar = transaksi
+  const totalPengeluaran = transactions
     .filter((t) => t.tipe === 'keluar')
-    .reduce((total, t) => total + t.nominal, 0);
+    .reduce((sum, t) => sum + t.nominal, 0);
 
-  // --- FORMAT RUPIAH ---
+  const saldo = totalPemasukan - totalPengeluaran;
+
+  // Format angka ke Rupiah
   const formatRupiah = (angka) => {
     return 'Rp ' + angka.toLocaleString('id-ID');
   };
 
-  // --- TAMBAH TRANSAKSI ---
+  // Handler tambah transaksi
   const tambahTransaksi = (tipe) => {
-    // Validasi input
-    if (!inputKet.trim()) {
-      Alert.alert('Peringatan', 'Deskripsi tidak boleh kosong!');
+    if (!keterangan.trim()) {
+      Alert.alert('Oops!', 'Nama transaksi nggak boleh kosong, Bro!');
       return;
     }
-    const nominal = parseFloat(inputNominal);
-    if (!inputNominal || isNaN(nominal) || nominal <= 0) {
-      Alert.alert('Peringatan', 'Masukkan nominal yang valid!');
+    const nominalAngka = parseInt(nominal.replace(/\D/g, ''), 10);
+    if (!nominalAngka || nominalAngka <= 0) {
+      Alert.alert('Oops!', 'Nominal harus lebih dari 0, Bro!');
       return;
     }
 
-    // Buat transaksi baru
-    const transaksiBarut = {
-      id: Date.now().toString(), // ID unik pakai timestamp
-      ket: inputKet.trim(),
-      nominal: nominal,
+    const transaksiBarু = {
+      id: Date.now().toString(),
+      ket: keterangan.trim(),
+      nominal: nominalAngka,
       tipe: tipe, // 'masuk' atau 'keluar'
     };
 
-    // Update state - tambahkan ke array
-    setTransaksi([transaksiBarut, ...transaksi]);
-
-    // Reset input form
-    setInputKet('');
-    setInputNominal('');
+    setTransactions([transaksiBarু, ...transactions]);
+    setKeterangan('');
+    setNominal('');
   };
 
-  // --- HAPUS TRANSAKSI ---
-  const hapusTransaksi = (id) => {
-    Alert.alert('Konfirmasi', 'Hapus transaksi ini?', [
-      { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Hapus',
-        style: 'destructive',
-        onPress: () => {
-          setTransaksi(transaksi.filter((t) => t.id !== id));
-        },
-      },
-    ]);
-  };
-
-  // --- RENDER ITEM FLATLIST ---
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.itemCard}
-      onLongPress={() => hapusTransaksi(item.id)}
-      activeOpacity={0.7}
-    >
-      {/* Indikator warna kiri */}
-      <View
-        style={[
-          styles.itemIndicator,
-          item.tipe === 'masuk'
-            ? styles.indicatorMasuk
-            : styles.indicatorKeluar,
-        ]}
-      />
-
-      {/* Isi item */}
-      <View style={styles.itemBody}>
-        <Text style={styles.itemKet}>{item.ket}</Text>
-        <Text style={styles.itemTipe}>
-          {item.tipe === 'masuk' ? '↑ Pemasukan' : '↓ Pengeluaran'}
-        </Text>
+  // Render tiap item transaksi
+  const renderItem = ({ item, index }) => (
+    <View style={[styles.itemCard, index === 0 && styles.itemCardFirst]}>
+      <View style={styles.itemLeft}>
+        <View
+          style={[
+            styles.itemIcon,
+            item.tipe === 'masuk' ? styles.iconMasuk : styles.iconKeluar,
+          ]}
+        >
+          <Text style={styles.iconText}>
+            {item.tipe === 'masuk' ? '↑' : '↓'}
+          </Text>
+        </View>
+        <View>
+          <Text style={styles.itemKet}>{item.ket}</Text>
+          <Text style={styles.itemTipe}>
+            {item.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
+          </Text>
+        </View>
       </View>
-
-      {/* Nominal - warna kondisional (HIJAU/MERAH) */}
       <Text
         style={[
           styles.itemNominal,
           item.tipe === 'masuk' ? styles.nominalMasuk : styles.nominalKeluar,
         ]}
       >
-        {item.tipe === 'masuk' ? '+' : '-'}
-        {formatRupiah(item.nominal)}
+        {item.tipe === 'masuk' ? '+' : '-'} {formatRupiah(item.nominal)}
       </Text>
-    </TouchableOpacity>
+    </View>
   );
 
-  // --- KOMPONEN UTAMA ---
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-
-      {/* ==================== HEADER SALDO ==================== */}
+  // Komponen header saldo
+  const ListHeader = () => (
+    <>
+      {/* Dashboard Saldo */}
       <View style={styles.saldoCard}>
-        <Text style={styles.saldoLabel}>Saldo Saat Ini</Text>
-        <Text
-          style={[
-            styles.saldoValue,
-            saldo >= 0 ? styles.saldoPositif : styles.saldoNegatif,
-          ]}
-        >
-          {formatRupiah(saldo)}
-        </Text>
-
-        {/* Sub-total masuk & keluar */}
-        <View style={styles.subTotalRow}>
-          <View style={styles.subTotalBox}>
-            <Text style={styles.subTotalLabel}>Pemasukan</Text>
-            <Text style={[styles.subTotalValue, styles.nominalMasuk]}>
-              {formatRupiah(totalMasuk)}
+        <Text style={styles.saldoLabel}>Saldo Kamu</Text>
+        <Text style={styles.saldoNominal}>{formatRupiah(saldo)}</Text>
+        <View style={styles.saldoRow}>
+          <View style={styles.saldoItem}>
+            <Text style={styles.saldoSubLabel}>💰 Pemasukan</Text>
+            <Text style={styles.saldoPemasukan}>
+              {formatRupiah(totalPemasukan)}
             </Text>
           </View>
-          <View style={styles.subTotalDivider} />
-          <View style={styles.subTotalBox}>
-            <Text style={styles.subTotalLabel}>Pengeluaran</Text>
-            <Text style={[styles.subTotalValue, styles.nominalKeluar]}>
-              {formatRupiah(totalKeluar)}
+          <View style={styles.divider} />
+          <View style={styles.saldoItem}>
+            <Text style={styles.saldoSubLabel}>🛍️ Pengeluaran</Text>
+            <Text style={styles.saldoPengeluaran}>
+              {formatRupiah(totalPengeluaran)}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* ==================== FORM INPUT ==================== */}
+      {/* Form Input */}
       <View style={styles.formCard}>
         <Text style={styles.formTitle}>Tambah Transaksi</Text>
-
-        {/* Input Deskripsi */}
         <TextInput
           style={styles.input}
-          placeholder="Deskripsi (contoh: Beli Makan)"
-          placeholderTextColor="#9CA3AF"
-          value={inputKet}
-          onChangeText={setInputKet}
-          maxLength={50}
+          placeholder="Nama transaksi (cth: Beli Kopi)"
+          placeholderTextColor="#aaa"
+          value={keterangan}
+          onChangeText={setKeterangan}
         />
-
-        {/* Input Nominal */}
         <TextInput
           style={styles.input}
-          placeholder="Nominal (contoh: 50000)"
-          placeholderTextColor="#9CA3AF"
-          value={inputNominal}
-          onChangeText={setInputNominal}
+          placeholder="Nominal (Rp)"
+          placeholderTextColor="#aaa"
           keyboardType="numeric"
+          value={nominal}
+          onChangeText={setNominal}
         />
-
-        {/* Tombol Aksi */}
-        <View style={styles.btnRow}>
+        <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.btn, styles.btnMasuk]}
+            style={[styles.button, styles.buttonMasuk]}
             onPress={() => tambahTransaksi('masuk')}
             activeOpacity={0.8}
           >
-            <Text style={styles.btnText}>+ Pemasukan</Text>
+            <Text style={styles.buttonText}>+ Pemasukan</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.btn, styles.btnKeluar]}
+            style={[styles.button, styles.buttonKeluar]}
             onPress={() => tambahTransaksi('keluar')}
             activeOpacity={0.8}
           >
-            <Text style={styles.btnText}>- Pengeluaran</Text>
+            <Text style={styles.buttonText}>- Pengeluaran</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ==================== LIST HISTORY ==================== */}
-      <Text style={styles.historyLabel}>
-        Riwayat ({transaksi.length} transaksi)
-      </Text>
+      {/* Label riwayat */}
+      <Text style={styles.riwayatLabel}>📋 Riwayat Transaksi</Text>
+    </>
+  );
 
-      <FlatList
-        data={transaksi}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Belum ada transaksi.</Text>
-            <Text style={styles.emptySubtext}>
-              Tambahkan pemasukan atau pengeluaran di atas!
-            </Text>
-          </View>
-        }
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        {/* App Header */}
+        <View style={styles.appHeader}>
+          <Text style={styles.appTitle}>💼 DompetKu</Text>
+          <Text style={styles.appSubtitle}>Catat, Kontrol, Tenang!</Text>
+        </View>
+
+        <FlatList
+          data={transactions}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🗂️</Text>
+              <Text style={styles.emptyText}>
+                Belum ada transaksi, Bro!
+              </Text>
+              <Text style={styles.emptySubText}>
+                Yuk mulai catat keuanganmu sekarang.
+              </Text>
+            </View>
+          }
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// =============================================
-// STYLES
-// =============================================
-const HIJAU = '#27A06A';    // Warna pemasukan (hijau)
-const MERAH = '#E24B4A';    // Warna pengeluaran (merah)
-
 const styles = StyleSheet.create({
-  container: {
+  flex: { flex: 1 },
+  safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#1a1a2e',
+  },
+
+  // --- App Header ---
+  appHeader: {
+    backgroundColor: '#1a1a2e',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a4e',
+  },
+  appTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  appSubtitle: {
+    fontSize: 13,
+    color: '#8888bb',
+    marginTop: 2,
+  },
+
+  // --- List ---
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    backgroundColor: '#f0f2f8',
   },
 
   // --- Saldo Card ---
   saldoCard: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: '#16213e',
+    borderRadius: 20,
+    padding: 24,
+    marginTop: 16,
+    marginBottom: 14,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   saldoLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontSize: 14,
+    color: '#8888bb',
+    marginBottom: 6,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  saldoValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 16,
+  saldoNominal: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
-  saldoPositif: {
-    color: HIJAU,
-  },
-  saldoNegatif: {
-    color: MERAH,
-  },
-  subTotalRow: {
+  saldoRow: {
     flexDirection: 'row',
     width: '100%',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
-  },
-  subTotalBox: {
-    flex: 1,
+    justifyContent: 'space-around',
     alignItems: 'center',
   },
-  subTotalDivider: {
+  saldoItem: { alignItems: 'center', flex: 1 },
+  saldoSubLabel: { fontSize: 12, color: '#8888bb', marginBottom: 4 },
+  saldoPemasukan: { fontSize: 16, fontWeight: '700', color: '#4ade80' },
+  saldoPengeluaran: { fontSize: 16, fontWeight: '700', color: '#f87171' },
+  divider: {
     width: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  subTotalLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 2,
-  },
-  subTotalValue: {
-    fontSize: 14,
-    fontWeight: '600',
+    height: 36,
+    backgroundColor: '#2a2a4e',
   },
 
   // --- Form Card ---
   formCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 8,
+    backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  formTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    marginBottom: 14,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e0e0f0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1a1a2e',
+    marginBottom: 10,
+    backgroundColor: '#f8f9ff',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonMasuk: { backgroundColor: '#22c55e' },
+  buttonKeluar: { backgroundColor: '#ef4444' },
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: 0.3,
+  },
+
+  // --- Riwayat Label ---
+  riwayatLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    marginBottom: 10,
+  },
+
+  // --- Item Card ---
+  itemCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  formTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
+  itemCardFirst: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366f1',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 14,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-    marginBottom: 10,
-  },
-  btnRow: {
+  itemLeft: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  btn: {
+    alignItems: 'center',
+    gap: 12,
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
   },
-  btnMasuk: {
-    backgroundColor: HIJAU,
-  },
-  btnKeluar: {
-    backgroundColor: MERAH,
-  },
-  btnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // --- History List ---
-  historyLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginHorizontal: 16,
-    marginBottom: 6,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+  itemIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    marginBottom: 6,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  itemIndicator: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
-  indicatorMasuk: {
-    backgroundColor: HIJAU,
-  },
-  indicatorKeluar: {
-    backgroundColor: MERAH,
-  },
-  itemBody: {
-    flex: 1,
-    padding: 12,
-  },
+  iconMasuk: { backgroundColor: '#dcfce7' },
+  iconKeluar: { backgroundColor: '#fee2e2' },
+  iconText: { fontSize: 18 },
   itemKet: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a2e',
+    marginBottom: 2,
   },
-  itemTipe: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
+  itemTipe: { fontSize: 12, color: '#888' },
   itemNominal: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    paddingRight: 12,
+    marginLeft: 8,
   },
-
-  // Warna Nominal - INI PENTING sesuai requirement!
-  nominalMasuk: {
-    color: HIJAU,   // HIJAU untuk pemasukan ✓
-  },
-  nominalKeluar: {
-    color: MERAH,   // MERAH untuk pengeluaran ✓
-  },
+  nominalMasuk: { color: '#22c55e' },
+  nominalKeluar: { color: '#ef4444' },
 
   // --- Empty State ---
-  emptyState: {
+  emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 48,
   },
+  emptyIcon: { fontSize: 52, marginBottom: 14 },
   emptyText: {
-    fontSize: 15,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#444',
+    marginBottom: 6,
   },
-  emptySubtext: {
+  emptySubText: {
     fontSize: 13,
-    color: '#9CA3AF',
-    marginTop: 4,
+    color: '#999',
+    textAlign: 'center',
   },
 });
